@@ -1,0 +1,26 @@
+# Requires Python 3.11–3.13 (pyarrow has no Python 3.15 wheels yet).
+
+# Data
+datasets==5.1.0
+pandas==3.1.0
+pyarrow==26.0.0
+
+# Models and config
+pydantic==2.14.1
+pydantic-settings==2.16.1
+
+# API
+fastapi==0.162.0
+uvicorn==0.54.0
+
+# LLM
+groq==1.7.0
+
+# UI
+streamlit==1.66.1
+requests==2.34.2
+
+# Testing and linting
+pytest==9.1.1
+httpx==0.28.1
+ruff==0.17.3

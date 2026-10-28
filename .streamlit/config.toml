@@ -1,0 +1,21 @@
+# Look and feel of the Streamlit UI (ui/streamlit_app.py). Streamlit reads this file
+# when started from the project root: `streamlit run ui/streamlit_app.py`.
+
+[theme]
+base = "dark"
+primaryColor = "#F2665A"
+backgroundColor = "#121012"
+secondaryBackgroundColor = "#1E1A1D"
+textColor = "#F3EEE9"
+borderColor = "#2E282B"
+showWidgetBorder = true
+baseRadius = "0.85rem"
+buttonRadius = "full"
+baseFontSize = 15
+font = "Plus Jakarta Sans:https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300..800&display=swap"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false

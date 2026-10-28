@@ -1,0 +1,68 @@
+{
+  "S01": [
+    {
+      "restaurant_id": "44118b1d342c",
+      "explanation": "Oye Amritsar is a North Indian casual dining spot rated 3.9 from 1,489 votes at ₹600 for two, the top of your medium budget. Reviewers praise its Amritsari kulcha and the jalebi with rabri, and it takes table bookings."
+    },
+    {
+      "restaurant_id": "e64b2b13734e",
+      "explanation": "eat.fit is rated 4.4 from 882 votes and costs ₹500 for two; it is a delivery kitchen whose North Indian dishes include dal makhani, chicken curry and paratha. One reviewer found a meal lacking in taste, so quality may vary."
+    },
+    {
+      "restaurant_id": "7a17986de210",
+      "explanation": "BOX8- Desi Meals is rated 4.3 from 314 votes at ₹500 for two, a takeaway and delivery option for North Indian and Mughlai food. Diners single out its dal makhani and paratha rolls."
+    },
+    {
+      "restaurant_id": "8d54b956d9ae",
+      "explanation": "Tea Brew is a cafe and casual dining spot rated 4.1 from 1,157 votes at ₹500 for two that lists North Indian among its cuisines; reviewers mention indoor and outdoor seating and liked the chilli chicken."
+    },
+    {
+      "restaurant_id": "519dc6095222",
+      "explanation": "Tayabbs is a quick-bites roll shop rated 4.0 from 739 votes at ₹500 for two; its popular dishes include the chicken malai roll and beda roti, and one reviewer raves about the butter chicken biryani."
+    }
+  ],
+  "S07": [
+    {
+      "restaurant_id": "46a589114a4f",
+      "explanation": "Cafe D'hide is a cafe rated 4.2 from 877 votes at ₹600 for two. One reviewer calls it a good place to read a book or work and says the takeaway service was quick; the data doesn't confirm laptop-friendly seating or power sockets."
+    },
+    {
+      "restaurant_id": "9081d15844d0",
+      "explanation": "Chai Galli is a cafe rated 4.4 from 481 votes at ₹450 for two, known for chai served by the kettle and sandwiches, and reviewers call it a place to sit and relax. The data confirms neither quick service nor whether it suits working on a laptop."
+    },
+    {
+      "restaurant_id": "d423632c2e8d",
+      "explanation": "Stoner is a dessert parlour and cafe rated 4.5 from 2,668 votes at ₹500 for two, popular for burgers and Ferrero Rocher ice cream; a reviewer suggests it for a light meal. The data doesn't say whether service is quick or whether it suits laptop work."
+    },
+    {
+      "restaurant_id": "7cae46162f68",
+      "explanation": "A Hole Lotta Love Cafe is rated 4.3 from 2,874 votes at ₹600 for two and is known for burgers, waffles and English breakfast. One reviewer found it calm, but another says the lasagne took a long time, so service may not be quick; laptop-friendliness isn't confirmed by the data."
+    },
+    {
+      "restaurant_id": "2279f72a6931",
+      "explanation": "Sixth Avenue Cafe And Patisserie is rated 4.5 from 210 votes at ₹600 for two, serving pasta, waffles and desserts. Reviewers love its decor, though one scored the service lower than the food, and the data doesn't confirm it suits laptop work."
+    }
+  ],
+  "S10": [
+    {
+      "restaurant_id": "361853af928c",
+      "explanation": "Barbeque Nation is rated 4.7 from 7,270 votes at ₹1,600 for two, a casual dining BBQ spot that takes table bookings, and one reviewer mentions being seated on its rooftop. The data doesn't confirm live music."
+    },
+    {
+      "restaurant_id": "94d8119272a0",
+      "explanation": "Tipsy Bull - The Bar Exchange is a bar rated 4.6 from 3,173 votes at ₹1,400 for two, where drink prices change with demand, and a reviewer enjoyed sitting outside. The data confirms neither a rooftop nor live music."
+    },
+    {
+      "restaurant_id": "808cdc981414",
+      "explanation": "Toit is a microbrewery rated 4.7 from 14,956 votes at ₹1,500 for two, known for its beer and pesto pizza; reviewers say it is always packed and can be noisy. Neither a rooftop nor live music is confirmed by the data."
+    },
+    {
+      "restaurant_id": "09144cec9970",
+      "explanation": "Chianti is an Italian casual dining restaurant rated 4.6 from 4,453 votes at ₹1,500 for two that takes table bookings. A reviewer liked the music, but the data doesn't say it is live or that there is a rooftop."
+    },
+    {
+      "restaurant_id": "68723a18f87f",
+      "explanation": "The Pizza Bakery is rated 4.8 from 1,785 votes at ₹1,200 for two, known for pizza, garlic bread and tiramisu, and it takes table bookings. A reviewer mentions climbing a staircase to reach it, but the data doesn't confirm a rooftop or live music."
+    }
+  ]
+}
