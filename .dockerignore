@@ -21,7 +21,5 @@ web/
 /logs/
 tests/
 docs/
-ui/
 scripts/
-.streamlit/
 .vscode/

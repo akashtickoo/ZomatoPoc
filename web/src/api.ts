@@ -1,5 +1,5 @@
-// Calls to the recommendation API (app/api/routes.py). A search's every outcome becomes one
-// of four result kinds, as request_recommendations() does in the Streamlit UI.
+// Calls to the recommendation API (app/api/routes.py). Every outcome of a search becomes one
+// of four result kinds (types.ts), so components never handle exceptions.
 
 import type { BudgetBands, Health, Payload, SearchResult } from "./types";
 

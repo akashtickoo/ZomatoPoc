@@ -1,4 +1,4 @@
-/** A soft banner (notice_html in the Streamlit UI). React renders every line as text. */
+/** A soft banner for warnings and errors. React renders every line as text. */
 export default function Notice({
   kind,
   title,

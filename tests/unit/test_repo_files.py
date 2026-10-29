@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parents[2]
-SOURCE_DIRS = ["app", "ui", "scripts", "tests", "data/processed", "web/src", "web/public"]
+SOURCE_DIRS = ["app", "scripts", "tests", "data/processed", "web/src", "web/public"]
 # The deploy files: the Render Blueprint and what Vercel builds web/ from.
 DEPLOY_FILES = [
     "render.yaml",

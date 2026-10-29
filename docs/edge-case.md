@@ -359,7 +359,7 @@ Cases marked **⚠ Decision needed** are not settled by the current architecture
 | EC-UI-02 | API becomes unreachable after the page loads | The error appears on submit; the previous results stay visible or are cleared clearly |
 | EC-UI-03 | The request takes a long time (LLM latency) | A spinner shows. The UI HTTP timeout is longer than the server's worst case (EC-LLM-06). |
 | EC-UI-04 | The user clicks submit again while a request is running | The identical request waits for the one already calling Groq instead of sending another (in-flight sharing in `CachingRankingClient`), so a double-click is still one Groq request; each run renders one result |
-| EC-UI-05 | The cached `/meta` data goes stale after a re-ingest | Restarting Streamlit clears it; or give `st.cache_data` a TTL |
+| EC-UI-05 | The cached `/meta` data goes stale after a re-ingest | The web UI reads `/meta/*` once per page load, so reloading the page picks up a re-ingest |
 | EC-UI-06 | A `422` with suggestions | The suggestions appear next to the field; the user can pick one |
 | EC-UI-07 | Empty results | A clear "No restaurants found" message with hints, such as removing a cuisine or lowering the rating |
 | EC-UI-08 | Fewer results than requested | Shown without an error, e.g. "Showing 3 of 5 requested" |
@@ -367,8 +367,8 @@ Cases marked **⚠ Decision needed** are not settled by the current architecture
 | EC-UI-10 | Null rating or cost | Shows "New" or "N/A", never `None` or `null` |
 | EC-UI-11 | The response has a fallback notice, relaxations, or both | The shortlist shows only the results, with no banners (changed 2026-10-28 at the user's request; both used to appear as separate banners). Fallback cards keep their "Ranked by rating and popularity" label |
 | EC-UI-12 | Narrow or mobile viewport | The layout stays readable; cards stack vertically |
-| EC-UI-20 | LLM explanations, summaries or review-derived text contain markdown or HTML | Shown **as plain text**: the UI builds its cards as HTML and passes every data or LLM value through `html.escape` first, so injected links or markup appear as typed |
-| EC-UI-21 | A user types more than 300 characters | The text area's `max_chars=300` stops it in the UI; the API enforces it too (EC-IN-41) |
+| EC-UI-20 | LLM explanations, summaries or review-derived text contain markdown or HTML | Shown **as plain text**: React renders every data or LLM value as text, and no UI source file may inject raw HTML (`web/src/safety.test.ts`), so injected links or markup appear as typed |
+| EC-UI-21 | A user types more than 300 characters | The text field's `maxLength` of 300 stops it in the UI; the API enforces it too (EC-IN-41) |
 
 ---
 
@@ -407,4 +407,4 @@ Map each group of cases to the test layer from architecture §11.
 | LLM faithfulness and safety | EC-LLM-30 to 36 | Injection tests with an LLM that obeys the injection (P6) plus the evaluation set (P7) | `tests/unit/test_injection.py`, `tests/eval/` |
 | Validation and enrichment | EC-VAL-01 to 08 | Unit tests | `tests/unit/test_recommender.py` |
 | API | EC-API-01 to 09 | Integration tests with `TestClient` | `tests/integration/test_api.py` |
-| UI | EC-UI-01 to 21 | Streamlit `AppTest` against a live API thread (fixture data, fake LLM), plus unit tests of the formatting helpers; EC-UI-03, 04 and 12 by hand | `tests/ui/test_streamlit_app.py` |
+| UI | EC-UI-01 to 21 | Vitest and Testing Library against a fake API, plus unit tests of the formatting helpers; EC-UI-12 by hand in headless Chrome | `web/src/App.test.tsx`, `format.test.ts`, `components/ResultCard.test.tsx`, `safety.test.ts` |

@@ -53,12 +53,12 @@ class Settings(BaseSettings):
     dataset_revision: str = "5738e9eda2fad49ad51c6e0ed26e761d9b947133"
 
     data_path: Path = PROJECT_ROOT / "data" / "processed" / "restaurants.parquet"
-    api_base_url: str = "http://localhost:8000"
+    api_base_url: str = "http://localhost:8000"  # the API scripts/demo.py calls
 
     # Browser origins allowed to call the API: the web front end in web/, locally on Vite's
     # dev server and in production on Vercel (docs/deployment-plan.md). A JSON list in the
     # environment, e.g. CORS_ORIGINS=["https://curated-cravings.vercel.app"]; empty allows
-    # none. The Streamlit UI calls the API from its own server and needs no entry.
+    # none. Server-side callers such as scripts/demo.py need no entry.
     cors_origins: list[str] = []
     # Optional: a pattern for this project's Vercel preview URLs, matched against the whole
     # origin.

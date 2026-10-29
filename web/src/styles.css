@@ -1,6 +1,4 @@
-/* Curated Cravings. The cc-* component rules are copied from ui/style.css; the theme
-   variables are the Streamlit theme in .streamlit/config.toml. The page is dark only, as
-   the Streamlit UI is. */
+/* Curated Cravings: a warm dark theme with a coral accent. The page is dark only. */
 
 :root {
   --cc-bg: #121012;
@@ -45,7 +43,7 @@ select {
 
 .cc-page { max-width: 1120px; margin: 0 auto; padding: 1.4rem 1rem 4rem; }
 
-/* --- Header (from ui/style.css) ------------------------------------------------------ */
+/* --- Header ------------------------------------------------------------------------ */
 
 .cc-nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
   padding: .3rem 0 1.1rem; border-bottom: 1px solid rgba(255,255,255,.06); flex-wrap: wrap; }
@@ -72,7 +70,7 @@ select {
   text-decoration-thickness: .07em; text-underline-offset: .14em; }
 .cc-sub { max-width: 640px; color: #b3aaa4; font-size: 1.02rem; line-height: 1.6; margin: 0; }
 
-/* --- Search card (was .st-key-search_card and Streamlit's widgets) -------------------- */
+/* --- Search card ---------------------------------------------------------------------- */
 
 .cc-search-card { background: rgba(28,24,27,.82); border: 1px solid #2c2629;
   border-radius: 26px; padding: 1.5rem 1.6rem 1.2rem; margin-bottom: 1rem;
@@ -143,7 +141,7 @@ input[type="range"] { width: 100%; margin: .7rem 0 0; accent-color: var(--cc-pri
 .cc-select__option--is-disabled { color: #6f6763; cursor: not-allowed; }
 .cc-select__menu-notice { padding: .5rem .7rem; color: #8f8681; }
 
-/* --- Results (from ui/style.css) ------------------------------------------------------- */
+/* --- Results ------------------------------------------------------------------------- */
 
 .cc-section { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem;
   flex-wrap: wrap; margin: 1.6rem 0 .6rem; }

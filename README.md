@@ -14,7 +14,7 @@ An AI-powered restaurant recommender for Bangalore, built as a proof of concept 
 4. **Check.** Any pick that wasn't a candidate is dropped, and every fact on a card (name, rating, cost, cuisines) is filled in from the dataset, never from the LLM.
 5. **Fall back.** If the LLM is down, slow, rate-limited or turned off, the pre-ranked candidates are returned with template explanations and a notice.
 
-The UI calls a FastAPI service, which does all of this. There are two versions of the UI with the same design: a Streamlit app for local use, and a static web app in `web/` that can be hosted on Vercel. [docs/architecture.md](docs/architecture.md) has the design.
+A web UI in `web/` (a static site, hosted on Vercel) calls a FastAPI service (hosted on Render), which does all of this. [docs/architecture.md](docs/architecture.md) has the design.
 
 ## Tech stack
 
@@ -25,9 +25,8 @@ The UI calls a FastAPI service, which does all of this. There are two versions o
 | API | FastAPI on Uvicorn | Typed request and response models, and interactive docs at `/docs` |
 | Schemas and config | Pydantic v2; `pydantic-settings` reads `.env` | One set of models validates the request, the API response and the LLM's answer |
 | LLM | Groq's Python SDK, model `openai/gpt-oss-120b`, reasoning effort `medium` | Strict structured outputs (Groq guarantees the JSON matches the schema), about 4 s and $0.0013 a search |
-| UI | Streamlit with a custom stylesheet; `requests` to call the API | A usable form and result cards with no front-end build step |
-| Web UI (`web/`) | Vite, React and TypeScript; `react-select`; Vitest | The same UI as static files, so it can be hosted on Vercel, where Streamlit can't run |
-| Tests and lint | `pytest`, FastAPI's `TestClient`, Streamlit's `AppTest`, `ruff` | Unit, API and UI tests run offline against a fake LLM |
+| UI (`web/`) | Vite, React and TypeScript; `react-select` for the searchable pickers | Static files that Vercel can host; React escapes everything it renders |
+| Tests and lint | `pytest`, FastAPI's `TestClient`, `ruff`; Vitest and Testing Library for the UI | Unit, API and UI tests run offline against a fake LLM or a fake API |
 | Evaluation | `qwen/qwen3.8-27b` on Groq as the LLM judge | A different model family from the one it grades |
 
 Exact versions are pinned in [requirements.txt](requirements.txt). The recommender reaches the LLM only through a small `RankingClient` interface ([app/llm/client.py](app/llm/client.py)), so the provider can be swapped: the LLM step was first built on Anthropic's Claude and later moved to Groq.
@@ -37,7 +36,7 @@ Exact versions are pinned in [requirements.txt](requirements.txt). The recommend
 - **Python 3.11–3.13** (pyarrow has no wheels for newer versions yet) and Git
 - **Internet access and about 1.5 GB of disk** for the first setup: the Python packages, and a one-time download of the dataset (a 574 MB CSV, which the Hugging Face cache keeps along with a converted copy of about the same size)
 - **A Groq API key**, free at https://console.groq.com/keys. It's optional: without one everything runs, using the fallback ranking.
-- **Node.js 24**, only for the web UI in `web/`.
+- **Node.js 24**, for the UI in `web/`.
 
 ## Setup
 
@@ -54,31 +53,23 @@ The processed data (`data/processed/restaurants.parquet` and `metadata.json`) is
 
 ## Run the app
 
-Start the API, then the UI, each in its own terminal (with the virtual environment active):
+Start the API, then the UI, each in its own terminal. The API needs the virtual environment active, and `CORS_ORIGINS=["http://localhost:5173"]` in `.env` (as in `.env.example`) so it accepts calls from the page:
 
 ```bash
 uvicorn app.main:app --reload            # API on http://localhost:8000
-streamlit run ui/streamlit_app.py        # UI on http://localhost:8501
-```
 
-Open http://localhost:8501 (**Curated Cravings**), pick a locality and press **Find restaurants**, or try one of the quick searches. The UI finds the API through `API_BASE_URL` (default `http://localhost:8000`). The first time you run Streamlit it asks for an email address; press Enter to skip.
-
-**The web UI** does the same in the browser. With the API running, and `CORS_ORIGINS=["http://localhost:5173"]` in `.env` (as in `.env.example`) so the API accepts calls from the page:
-
-```bash
 cd web
-npm install
+npm install                              # once
 npm run dev                              # UI on http://localhost:5173
 ```
 
-It finds the API through `VITE_API_BASE_URL` (default `http://localhost:8000`; see `web/.env.example`).
+Open http://localhost:5173 (**Curated Cravings**), pick a locality and press **Find restaurants**, or try one of the quick searches. The UI finds the API through `VITE_API_BASE_URL` (default `http://localhost:8000`; see `web/.env.example`). `docker compose up --build` runs both in containers instead (see [Deployment](#deployment)).
 
 **Shortcuts.** `tasks.py` wraps the common commands so they're the same on every OS:
 
 ```bash
 python tasks.py ingest      # download and clean the dataset
 python tasks.py api         # start the API
-python tasks.py ui          # start the UI
 python tasks.py test        # tests, then the linter
 python tasks.py demo        # run the demo scenes against the running API
 python tasks.py eval ...    # quality evaluation (see below)
@@ -279,11 +270,11 @@ These figures include the overall summary the LLM wrote until it was dropped lat
 ## Tests
 
 ```bash
-pytest          # no network or API key needed; the LLM is faked, the UI tests start their own API
+pytest          # no network or API key needed; the LLM is faked
 ruff check .
 ```
 
-`pytest` includes unit tests for the evaluation harness, the demo runner and `tasks.py`; running the evaluation itself is described next. The web UI has its own tests, run against a fake API, and a type-checked production build:
+`pytest` includes unit tests for the evaluation harness, the demo runner and `tasks.py`; running the evaluation itself is described next. The UI has its own tests, run against a fake API, and a type-checked production build:
 
 ```bash
 cd web
@@ -326,8 +317,7 @@ app/
   models/          Restaurant, UserPreferences, response schemas
   services/        filtering and pre-ranking, recommender, template explanations
   llm/             Groq client, response cache, prompt builder, system prompt
-ui/                Streamlit front end and its stylesheet (theme in .streamlit/config.toml)
-web/               the same front end as a static Vite + React site, for Vercel
+web/               the UI: a static Vite + React site, for Vercel
 data/processed/    the cleaned dataset the API loads (rebuilt by app.data.ingest)
 scripts/demo.py    the demo scenes, run against the API
 render.yaml        Render Blueprint for the API (requirements-api.txt, .python-version)

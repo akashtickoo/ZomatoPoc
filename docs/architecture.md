@@ -64,7 +64,7 @@ flowchart LR
     end
 
     subgraph Online["Online (per request)"]
-        UI[Streamlit UI] -->|preferences| API[FastAPI service]
+        UI[Web UI] -->|preferences| API[FastAPI service]
         API --> FIL[Candidate Filter<br/>& Pre-ranker]
         PQ -.loaded at startup.-> FIL
         FIL -->|top-K candidates| PB[Prompt Builder]
@@ -91,13 +91,13 @@ The system has two parts:
 | Language | Python 3.11–3.13 (developed on 3.13) | Best ecosystem for data loading and LLM SDKs. 3.15 is not supported yet: `pyarrow` has no prebuilt wheels for it. |
 | Data loading | `datasets` (Hugging Face), `pandas`, `pyarrow` | Direct download from HF; fast Parquet I/O |
 | Backend API | FastAPI + Uvicorn | Typed request/response models (Pydantic), automatic OpenAPI docs |
-| Frontend | Streamlit | Fastest way to build a usable form + results UI for a POC |
+| Frontend | Vite + React + TypeScript, built to static files | Hostable on Vercel; React escapes every value it renders. The POC first ran on Streamlit (replaced 2026-10-30, §5.10) |
 | LLM | Groq via the official `groq` Python SDK, model `openai/gpt-oss-120b` | A production reasoning model with strict structured outputs (schema-guaranteed JSON), fast inference, and low cost ($0.15 / $0.60 per million input / output tokens) |
 | Validation | Pydantic v2 | Shared schemas for the API and LLM output |
 | Config | `pydantic-settings` + `.env` | Keeps secrets and tunables out of the code |
-| Testing | `pytest`, Streamlit `AppTest`, `ruff` | Unit, API and UI tests with no network access; lint and format |
+| Testing | `pytest`, `ruff`; Vitest and Testing Library for the UI | Unit, API and UI tests with no network access; lint and format |
 
-> The Streamlit UI calls the FastAPI service over HTTP. That keeps the UI replaceable (for example by React later) and lets the recommendation API be tested on its own. For an even smaller POC, Streamlit can import the service layer directly and the FastAPI tier can be skipped. The module boundaries below stay the same either way.
+> The UI calls the FastAPI service over HTTP. That kept it replaceable, and it was replaced: the POC's Streamlit UI became the React app in `web/`, and the API only gained CORS and `/meta/budgets`. It is tested on its own.
 
 ---
 
@@ -355,7 +355,7 @@ The schema is defined in `app/models/recommendation.py`.
 - Every response carries an `X-Request-ID` header: the id of that request's log line (§10).
 - `413`: `{"detail": "Request body too large; the limit is 16384 bytes."}`. A full request is under 2 KB, so a larger body is refused before it is parsed, whether it declares a `Content-Length` or arrives chunked (EC-IN-54).
 - `/meta/locations` and `/meta/cuisines`: `{"locations": [...]}` and `{"cuisines": [...]}`, sorted case-insensitively.
-- `/meta/budgets`: `{"low_max": 300, "medium_max": 600}`, from `BUDGET_LOW_MAX` and `BUDGET_MEDIUM_MAX`. The web UI builds its budget labels from it; the Streamlit UI reads the settings directly.
+- `/meta/budgets`: `{"low_max": 300, "medium_max": 600}`, from `BUDGET_LOW_MAX` and `BUDGET_MEDIUM_MAX`. The web UI builds its budget labels from it.
 - `422`: the same shape FastAPI uses for its own validation errors, so a client handles one format. An unknown location or cuisine has `type: "unknown_value"` and up to 3 close matches:
 
   ```json
@@ -367,31 +367,23 @@ The schema is defined in `app/models/recommendation.py`.
 
 **Wiring** (`app/main.py`): `create_app(cfg, load_repository, make_llm)` builds the app, and the lifespan hook sets up JSON logging and loads the repository and LLM client once, before the first request. Two ASGI middlewares (`app/api/middleware.py`) wrap every request: `RequestLogMiddleware` assigns the request id, writes the log line and turns an unhandled exception into the `500` above; inside it, `BodySizeLimitMiddleware` enforces the `413`. Outside both, Starlette's `CORSMiddleware` lets the web front end call the API from the browser, from the origins in `CORS_ORIGINS` and `CORS_ORIGIN_REGEX` only (none by default). Being outermost, it adds its headers to the `413` and `500` responses too, which a browser would otherwise hide behind a CORS error; it answers preflight requests itself, so those get no request id or log line. Routes get the shared `RecommendationService`, repository and settings through FastAPI dependencies (`get_service`, `get_repository`, `get_settings`), so tests swap in fixture data and a fake LLM. Endpoints are plain `def`, so a slow LLM call runs in the thread pool without blocking other requests (EC-API-03).
 
-### 5.10 Frontend (`web/` and `ui/streamlit_app.py`)
+### 5.10 Frontend (`web/`)
 
-"Curated Cravings": a single page in a warm dark theme with a soft coral accent, modelled on restaurant-discovery apps. It exists twice, with the same design and behaviour: the Streamlit app, which ran the POC, and a port of it in `web/`, a static site for hosting on Vercel, where Streamlit's long-running server can't run ([deployment-plan.md](deployment-plan.md)). Both call the same API.
+"Curated Cravings": a single page in a warm dark theme with a soft coral accent, modelled on restaurant-discovery apps. It's a static site (Vite, React and TypeScript) hosted on Vercel ([deployment-plan.md](deployment-plan.md)). Until 2026-10-30 the same design ran as a Streamlit app (`ui/streamlit_app.py`); Vercel can't run Streamlit's long-running server, so it was ported to `web/` and then removed.
 
 - **Header:** a slim navigation bar (Bangalore, the number of neighbourhoods) and a hero with the title "Curated Cravings".
-- **Search card on the main screen:** locality (searchable select, starting with "All of Bangalore", sent as `Bangalore`, D-04), cuisines (multi-select), minimum rating (slider), budget for two (segmented control showing the ₹ thresholds from config), "Anything else?" free text (300 characters) and how many results. The footer says how the last search was ranked ("Screened 15 candidates · AI ranked top 5") next to the **Find restaurants** button. Dropdown options come from `/meta/*`, so users can only pick values that exist in the data.
+- **Search card on the main screen:** locality (searchable select, starting with "All of Bangalore", sent as `Bangalore`, D-04), cuisines (searchable multi-select, at most 10), minimum rating (slider), budget for two (segmented control showing the ₹ thresholds from `/meta/budgets`), "Anything else?" free text (300 characters) and how many results. The footer says how the last search was ranked ("Screened 15 candidates · AI ranked top 5") next to the **Find restaurants** button. Options come from `/meta/*`, so users can only pick values that exist in the data.
 - **Results:** one card per restaurant: a rank badge, the name, Table booking and Online ordering tags, ★ rating with votes, ₹ cost for two, location, type, cuisine chips, the explanation ("Why it fits", or "Ranked by rating and popularity" for a template explanation) and the dishes it is known for. "Your shortlist" shows only these cards: the relaxation and fallback banners were removed at the user's request (2026-10-28), though the API still returns `relaxations` and `notice`. A footer line says how the list was ranked ("Ranked by openai/gpt-oss-120b · 15 candidates considered…"). There is no overall summary: the "Why these picks" card was removed at the user's request (2026-10-28), since each card already explains its pick, and the LLM no longer writes a summary or the API returns one.
 - **Empty state:** a prompt plus quick-search pills ("South Indian in Jayanagar") that fill the form and search. Only pills whose values exist in the data are shown.
-- **Look:** colours, font (Plus Jakarta Sans), corner radius and pill-shaped buttons are set in `.streamlit/config.toml`; layout and card styles are in `ui/style.css`. On narrow screens the columns and cards stack, and the budget options wrap.
+- **Look:** `web/src/styles.css`: colours as CSS variables, the Plus Jakarta Sans font, rounded and pill-shaped controls. On narrow screens the columns and cards stack, and the budget options wrap.
 
-As built (`ui/streamlit_app.py`):
+As built (`web/src/`):
 
-- **Escaping:** cards and notices are HTML built by the app; every value from the data or the LLM goes through `html.escape` first, so markdown, links or tags in a review or explanation show as text (EC-UI-20).
-- **State:** the filters and the last result live in `st.session_state`, so they survive reruns. Only pressing Find restaurants or a quick-search pill calls the API; changing a filter doesn't. A new search replaces the result, and a failed search clears it rather than leaving stale cards (EC-UI-02).
-- **Caching:** `/meta/*` is cached for an hour and `/health` for 30 s (EC-UI-05). The request timeout is the LLM timeout plus a margin; the API makes one LLM call per search (EC-UI-03).
+- **Escaping:** React renders every value from the data or the LLM as text, and no source file may use `dangerouslySetInnerHTML` (`safety.test.ts` checks), so markdown, links or tags in a review or explanation show as text (EC-UI-20).
+- **State and calls:** the filters and the last result live in React state. Only pressing Find restaurants or a quick-search pill calls the API; changing a filter doesn't. A new search replaces the result, and a failed search clears it rather than leaving stale cards (EC-UI-02). The button is disabled while a search runs (EC-UI-04). Every outcome becomes one of four result kinds (`ok`, `invalid`, `unavailable`, `error`, in `api.ts`), so components never handle exceptions.
+- **Timeouts and a sleeping API:** the search timeout is the LLM timeout plus a margin (90 s; EC-UI-03). The hosted API sleeps when idle, so on load the page polls `/health` every 5 s for up to 3 minutes, saying the kitchen is waking up, before it shows the EC-UI-01 error with Retry; a tab idle for 14 minutes checks `/health` again before searching. `/meta/*` is read once per page load (EC-UI-05).
 - **Errors:** an unreachable API shows a message and a Retry button instead of the form (EC-UI-01); a 422 shows the message with one-click suggestions (EC-UI-06); a 500 shows the server's reference id; a banner says AI ranking is off, and why, when `/health` reports the LLM unconfigured, rejected or disabled.
-- **Config:** the API URL (`API_BASE_URL`), budget thresholds and LLM timeout come from `app.config`, the same settings the API uses.
-
-The web front end (`web/`): Vite, React and TypeScript, built to static files.
-
-- **Escaping:** React renders every value as text, and no source file may use `dangerouslySetInnerHTML` (a test checks), so EC-UI-20 holds without escaping by hand.
-- **State and calls:** the same as above: the filters and the last result live in React state, only Find restaurants or a quick-search pill calls the API, and the result kinds (`ok`, `invalid`, `unavailable`, `error`) are those of the Streamlit app (`web/src/api.ts`). The button is disabled while a search runs (EC-UI-04).
-- **A sleeping API:** the hosted API sleeps when idle. On load the page polls `/health` every 5 s for up to 3 minutes, saying the kitchen is waking up, before it shows the EC-UI-01 error with Retry; a tab idle for 14 minutes checks `/health` again before searching.
-- **Config:** the API URL comes from `VITE_API_BASE_URL`, compiled into the bundle at build time, and the budget labels from `/meta/budgets`. Browser calls need the page's origin in the API's `CORS_ORIGINS`.
-- **Look:** `web/src/styles.css` holds the `cc-*` rules from `ui/style.css` and the theme from `.streamlit/config.toml`.
+- **Config:** the API URL comes from `VITE_API_BASE_URL`, compiled into the bundle at build time. Browser calls need the page's origin in the API's `CORS_ORIGINS`.
 
 ---
 
@@ -400,7 +392,7 @@ The web front end (`web/`): Vite, React and TypeScript, built to static files.
 ```mermaid
 sequenceDiagram
     actor U as User
-    participant UI as Streamlit UI
+    participant UI as Web UI
     participant API as FastAPI
     participant F as Filter & Pre-ranker
     participant P as Prompt Builder
@@ -455,11 +447,7 @@ ZomatoPoc/
 │       ├── client.py           # Groq SDK wrapper
 │       ├── prompt_builder.py
 │       └── prompts/system.md   # Versioned system prompt
-├── ui/
-│   ├── streamlit_app.py
-│   └── style.css               # Layout and card styles
-├── .streamlit/config.toml      # Theme: colours, font, corner radius
-├── web/                        # The same UI as a static site for Vercel (§5.10)
+├── web/                        # The UI, a static site for Vercel (§5.10)
 │   ├── src/                    # App, components, API calls, helpers, Vitest tests
 │   ├── package.json            # Exact versions; Node 24
 │   ├── vercel.json
@@ -471,7 +459,6 @@ ZomatoPoc/
 ├── tests/
 │   ├── unit/
 │   ├── integration/            # API via TestClient
-│   ├── ui/                     # Streamlit AppTest against a live API thread
 │   ├── eval/                   # Quality evaluation, run on demand (docs/eval.md)
 │   └── fixtures/sample_restaurants.parquet
 ├── docs/
@@ -506,8 +493,8 @@ ZomatoPoc/
 | Request body over 16 KB | `413` before the body is parsed; no LLM call | `test_api.py::test_oversized_body_*` |
 | No candidates after relaxation | `200` with an empty list and an explanatory message; no LLM call | `test_api.py::test_no_results`, `test_recommender.py::test_no_candidates_means_no_llm_call` |
 | LLM timeout, 5xx or rate limit (no retries) | Return the **deterministic pre-ranked** top N with template explanations, `source="fallback"`, and a `notice` saying AI explanations are unavailable; the UI labels each card "Ranked by rating and popularity"; log line at WARNING | `test_llm_client.py::test_transport_and_api_errors`, `test_one_search_sends_exactly_one_request`; `test_recommender.py::test_llm_failure_uses_the_fallback_ranking`, `test_log_line_for_a_fallback`; `test_api.py::test_llm_failure_falls_back` |
-| LLM key rejected (401/403), unknown model (404) or bad request (400) | Same fallback; log line at ERROR, since only a configuration fix helps. A rejected key also shows in `/health` (`llm: "rejected"`) and the UI | `test_llm_client.py::test_a_rejected_key_is_remembered_until_a_call_succeeds`; `test_api.py::test_api_key_never_reaches_logs_or_responses`; `test_streamlit_app.py::test_notice_when_groq_rejects_the_key` |
-| No `GROQ_API_KEY` (or a blank one), or `LLM_ENABLED=false` | The service starts and serves the fallback ranking without contacting Groq; `/health` says `unconfigured` or `disabled`, and the UI says why AI ranking is off | `test_api.py::test_health_and_fallback_without_an_api_key`, `test_llm_enabled_false_serves_the_fallback`; `test_llm_client.py::test_a_blank_key_means_no_key`; `test_streamlit_app.py::test_notice_when_the_llm_is_turned_off` |
+| LLM key rejected (401/403), unknown model (404) or bad request (400) | Same fallback; log line at ERROR, since only a configuration fix helps. A rejected key also shows in `/health` (`llm: "rejected"`) and the UI | `test_llm_client.py::test_a_rejected_key_is_remembered_until_a_call_succeeds`; `test_api.py::test_api_key_never_reaches_logs_or_responses`; `web/src/App.test.tsx`: "says when AI ranking is off (rejected)" |
+| No `GROQ_API_KEY` (or a blank one), or `LLM_ENABLED=false` | The service starts and serves the fallback ranking without contacting Groq; `/health` says `unconfigured` or `disabled`, and the UI says why AI ranking is off | `test_api.py::test_health_and_fallback_without_an_api_key`, `test_llm_enabled_false_serves_the_fallback`; `test_llm_client.py::test_a_blank_key_means_no_key`; `web/src/App.test.tsx`: "says when AI ranking is off (disabled)" |
 | LLM `finish_reason` other than `stop` (e.g. `length`), or empty or invalid content | Same fallback; the log line has the reason, `finish_reason`, Groq request id and the tokens spent | `test_llm_client.py::test_cut_off_response`, `test_unusable_output`; `test_recommender.py::test_tokens_spent_on_a_cut_off_answer_are_logged` |
 | LLM returns unknown or duplicate IDs, or obeys an injected instruction | Filter them out and backfill ([§5.8](#58-response-validator-and-enricher-appservicesrecommenderpy)) | `test_recommender.py::test_hallucinated_ids_never_reach_the_output`, `test_duplicate_ids_are_dropped`; `test_injection.py` |
 | Unhandled exception | `500` with a request id; the traceback goes only to the log line with the same id | `test_api.py::test_unhandled_error_returns_a_generic_500` |
@@ -535,7 +522,7 @@ All tunables live in `app/config.py` and can be overridden through environment v
 | `BUDGET_LOW_MAX` / `BUDGET_MEDIUM_MAX` | `300` / `600` | Budget band thresholds (₹ for two) |
 | `DATASET_REPO` / `DATASET_REVISION` | `ManikaSaini/zomato-restaurant-recommendation` / `5738e9e…` | Source dataset, pinned to a commit so ingests are reproducible |
 | `DATA_PATH` | `data/processed/restaurants.parquet` | Processed data location |
-| `API_BASE_URL` | `http://localhost:8000` | Used by the Streamlit UI |
+| `API_BASE_URL` | `http://localhost:8000` | The API that `scripts/demo.py` calls |
 | `CORS_ORIGINS` | `[]` | Browser origins allowed to call the API, as a JSON list: the web front end (`["http://localhost:5173"]` locally, the Vercel URL in production). Trailing slashes are dropped |
 | `CORS_ORIGIN_REGEX` | – | Optional pattern for this project's Vercel preview URLs, matched against the whole origin |
 | `LOG_LEVEL` | `INFO` | Level for the app's own loggers (libraries log warnings and up) |
@@ -582,7 +569,7 @@ The quality evaluation adds its own `EVAL_JUDGE_*` variables (judge model, reaso
 | Unit | Validator: unknown IDs dropped, duplicates removed, backfill | Fake `LLMRanking` objects |
 | Unit | Prompt injection, key redaction, logging and cost | An LLM that obeys hostile reviews and free text (`test_injection.py`); log lines checked for completeness and leaked keys (`test_observability.py`) |
 | Integration | `POST /recommendations` end to end | FastAPI `TestClient` with the LLM client **mocked** |
-| UI | The form, the cards, every banner and error state, hostile markup | Streamlit `AppTest` against a live API thread over the fixture data, with a fake LLM |
+| UI | The form, the cards, every banner and error state, hostile markup | Vitest and Testing Library in `web/src`, against a fake API that follows `app/api/routes.py`; layout checked by hand in headless Chrome |
 | LLM quality | Explanations cite real facts; ranking respects preferences | `tests/eval/`: 24 scenarios run through `RecommendationService` against the real API, checked by code (P1–P12) and by an LLM judge from another model family (J1–J4), with 95% intervals; run on demand, not in CI ([eval.md](eval.md)) |
 
 ---
