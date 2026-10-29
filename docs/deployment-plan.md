@@ -306,7 +306,7 @@ Each item is covered by a test in `web/src`, except EC-UI-12, which was checked 
   - **Framework Preset:** Vite (detected), build command `npm run build`, output directory `dist`. `web/vercel.json` sets all three.
   - **Environment variable:** `VITE_API_BASE_URL` = the Render URL from Phase 2, for Production and Preview
 - [ ] Deploy.
-- [x] So that backend-only commits don't rebuild the site, `web/vercel.json` sets `ignoreCommand` to `git diff --quiet HEAD^ HEAD -- .`, which runs inside `web/`. This replaces the **Ignored Build Step** setting in the dashboard. Render's `buildFilter` does the same for the API.
+- [x] So that backend-only commits don't rebuild the site, `web/vercel.json` sets `ignoreCommand`, which runs inside `web/`. It skips a build only when nothing in `web/` changed since the last successful deployment (`$VERCEL_GIT_PREVIOUS_SHA`). With no previous deployment, or a previous commit missing from Vercel's shallow clone, it builds. This replaces the **Ignored Build Step** setting in the dashboard. *(The first version compared `HEAD^` with `HEAD`, so the very first deploy was skipped when the latest commit touched only the API.)* Render's `buildFilter` does the same for the API.
 
 **About `VITE_` variables.** Vite compiles them into the JavaScript bundle at build time. They are public, so **never put `GROQ_API_KEY` or any other secret in Vercel**. Changing one takes effect only after a redeploy.
 
