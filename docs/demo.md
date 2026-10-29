@@ -8,8 +8,8 @@ A 10-minute walkthrough that shows what the recommender does: a strict match, a 
 
 ## Before you start
 
-1. Set up the project as the [README](../README.md) describes: virtual environment, `.env` with `GROQ_API_KEY`, and `python tasks.py ingest`.
-2. Start the API and the UI, each in its own terminal: `python tasks.py api` and `python tasks.py ui`. Open http://localhost:8501.
+1. Set up the project as the [README](../README.md) describes: virtual environment, `.env` with `GROQ_API_KEY` and `CORS_ORIGINS=["http://localhost:5173"]`, and `npm install` in `web/`.
+2. Start the API and the UI, each in its own terminal: `python tasks.py api`, and `npm run dev` in `web/`. Open http://localhost:5173. (Or demo the deployed site; the first visit after a quiet spell waits a minute while the API wakes up, so open it beforehand.)
 3. Check the top of the page: there should be **no** "AI ranking is off" banner. If there is one, it says why (no key, a rejected key, or the LLM turned off).
 4. **Rehearse with `python tasks.py demo`, against the API you will demo with.** The API remembers each answer for 24 hours, so when you then make the same searches in the UI they come back instantly and spend no tokens. The scenes below use the UI's defaults (5 results) so that the requests match exactly. Pick cuisines in the order given: the order is part of the request.
 5. Mind the Groq allowance. Each new AI search uses about 5,000 tokens; Groq's free tier allows 200,000 a day, refilled gradually. If AI explanations are unavailable when they shouldn't be, the allowance is spent; it refills at about 8,000 tokens an hour.

@@ -32,7 +32,7 @@ export interface SearchFormProps {
   status: ReactNode;
 }
 
-/** The filter card (search_card in the Streamlit UI). */
+/** The filter card: every value the API takes, with options read from /meta/*. */
 export default function SearchForm({
   options,
   value,

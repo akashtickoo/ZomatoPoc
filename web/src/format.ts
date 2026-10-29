@@ -1,5 +1,4 @@
-// Form constants and pure helpers, ported from ui/streamlit_app.py. format.test.ts checks
-// them against the same cases as tests/ui/test_streamlit_app.py. Case IDs refer to
+// Form constants and pure helpers, unit-tested in format.test.ts. Case IDs refer to
 // docs/edge-case.md §9.
 
 import type { BudgetBands, LlmState, Payload } from "./types";
@@ -41,7 +40,7 @@ export const QUICK_SEARCHES: Record<string, Partial<FormState> & { location: str
   },
 };
 
-// Grouped like Python's f"{n:,}" in the Streamlit UI: 5,352.
+// Grouped in thousands, as the rest of the project writes numbers: 5,352.
 export const formatNumber = (n: number): string => n.toLocaleString("en-US");
 
 export function count(n: number, singular: string, plural?: string): string {

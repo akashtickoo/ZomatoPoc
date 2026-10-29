@@ -8,11 +8,9 @@ This plan puts Curated Cravings online: the FastAPI service on [Render](https://
 
 ## The one thing to know first
 
-**The current front end can't run on Vercel.** `ui/streamlit_app.py` is a Streamlit app, and Streamlit is a long-running Python server that keeps a WebSocket open to each browser tab. Vercel hosts static files and short-lived functions, so there's nothing on it that can run that server.
+**The original front end couldn't run on Vercel.** `ui/streamlit_app.py` was a Streamlit app, and Streamlit is a long-running Python server that keeps a WebSocket open to each browser tab. Vercel hosts static files and short-lived functions, so there's nothing on it that can run that server.
 
 Putting the front end on Vercel therefore means **rebuilding the UI as a static web app** (`web/`, Phase 3) that calls the API from the browser. That's most of the work in this plan. The API itself needs only small changes.
-
-If the goal is just to get the app online quickly, [Option B](#option-b-keep-streamlit-and-host-it-on-render) at the end runs the existing Streamlit UI as a second Render service instead, in about an hour, without using Vercel.
 
 ---
 
@@ -41,7 +39,7 @@ Checked on 2026-10-30 against the code, the platforms' documentation and a local
 
 | Finding | Consequence |
 |---|---|
-| The UI is Streamlit (see above) | Rebuild it as a static app for Vercel (Phase 3), or use Option B |
+| The UI is Streamlit (see above) | Rebuild it as a static app for Vercel (Phase 3) |
 | `data/` is git-ignored, and the ingest downloads a 574 MB CSV and needs about 1.5 GB of disk. The processed output (`data/processed/`) is only **3.4 MB** | Commit the processed data, so Render never runs the ingest (task 1.3) |
 | `tests/unit/test_repo_files.py` asserts that `restaurants.parquet` **is** git-ignored | That test changes with task 1.3 |
 | Render's default Python for services created on or after 2026-10-12 is **3.14.8**. The project supports 3.11–3.13 (pyarrow wheels) | Pin the version with a `.python-version` file (task 1.1) |
@@ -95,8 +93,7 @@ Phases 2 and 3 can run in parallel: the front end is built against the local API
   # requirements.txt: everything for local development
   -r requirements-api.txt
   datasets==5.1.0
-  streamlit==1.66.1
-  requests==2.34.2
+  requests==2.34.2  # scripts/demo.py
   pytest==9.1.1
   httpx==0.28.1
   ruff==0.17.3
@@ -282,7 +279,7 @@ Each item is covered by a test in `web/src`, except EC-UI-12, which was checked 
 
 **Styles.** Copy the `cc-*` rules from `ui/style.css` unchanged. Replace the Streamlit-specific selectors (`.stApp`, `[data-testid=…]`, `.st-key-search_card`) with the app's own elements. Turn the theme values in `.streamlit/config.toml` (background `#121012`, primary `#F2665A`, text `#F3EEE9`, the Plus Jakarta Sans font and the corner radii) into CSS variables.
 
-**The Streamlit UI** stays in `ui/` for local use until the web app is accepted. Whether to remove it, along with its tests and the Streamlit dependency, is a later decision.
+**The Streamlit UI** was removed on 2026-10-30, once the web app was live: `ui/`, `.streamlit/`, `tests/ui/` and the `streamlit` package. `web/` is the only front end.
 
 **Deliverables:** `web/` with tests; `docs/architecture.md` §5.10 updated to describe the new front end
 
@@ -303,7 +300,7 @@ Each item is covered by a test in `web/src`, except EC-UI-12, which was checked 
 - [ ] Push `web/` to `main`.
 - [ ] In Vercel, choose **Add New → Project** and import `akashtickoo/ZomatoPoc`.
   - **Root Directory:** `web`
-  - **Framework Preset:** Vite (detected), build command `npm run build`, output directory `dist`. `web/vercel.json` sets all three.
+  - **Framework Preset:** Vite (detected), build command `npm run build`, output directory `dist`. `web/vercel.json` sets all three, and installs with `npm ci`, exactly as locked. Both npm commands run without `npm_config_cache_dir`: Vercel's build machine sets that variable, npm 11 doesn't recognise it (it has no effect) and warns about it once per command.
   - **Environment variable:** `VITE_API_BASE_URL` = the Render URL from Phase 2, for Production and Preview
 - [ ] Deploy.
 - [x] So that backend-only commits don't rebuild the site, `web/vercel.json` sets `ignoreCommand`, which runs inside `web/`. It skips a build only when nothing in `web/` changed since the last successful deployment (`$VERCEL_GIT_PREVIOUS_SHA`). With no previous deployment, or a previous commit missing from Vercel's shallow clone, it builds. This replaces the **Ignored Build Step** setting in the dashboard. *(The first version compared `HEAD^` with `HEAD`, so the very first deploy was skipped when the latest commit touched only the API.)* Render's `buildFilter` does the same for the API.
@@ -413,30 +410,6 @@ Things to know:
 ```
 
 Render sets `PORT` and runs its own `/health` check, and the rest of the Blueprint stays the same. Also add `Dockerfile` to `buildFilter.paths`. The native service is the default because it builds faster on the free plan and was checked end to end. The Docker image is the way to go if the app needs system packages or must run identically somewhere else. Vercel doesn't run containers, so the web front end stays a static Vercel build. `web/Dockerfile` is for local use and for other hosts.
-
----
-
-## Option B: Keep Streamlit and Host It on Render
-
-This is the fastest way to get the app online, at the cost of not using Vercel. Add a second service to `render.yaml`:
-
-```yaml
-  - type: web
-    name: curated-cravings-ui
-    runtime: python
-    plan: free
-    region: singapore
-    buildCommand: pip install -r requirements-api.txt streamlit==1.66.1 requests==2.34.2
-    startCommand: streamlit run ui/streamlit_app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
-    envVars:
-      - key: API_BASE_URL
-        value: https://curated-cravings-api.onrender.com
-```
-
-- **No CORS change is needed**, because Streamlit calls the API from its own server. Tasks 1.4 and 1.5 can be skipped.
-- `--server.headless true` skips Streamlit's first-run email prompt. `.streamlit/config.toml` is picked up because the command runs from the repository root.
-- Both free services sleep, so a cold visit can wait for two wake-ups. The UI's 10 s timeout on its `/meta` calls will show EC-UI-01 ("We can't reach the kitchen") with **Retry** until the API is up. The two services also share the 750 free hours.
-- [Streamlit Community Cloud](https://streamlit.io/cloud) is another free host made for Streamlit apps, with the API still on Render.
 
 ---
 

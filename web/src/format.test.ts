@@ -1,5 +1,3 @@
-// The same cases as the helper tests in tests/ui/test_streamlit_app.py.
-
 import { describe, expect, it } from "vitest";
 
 import {

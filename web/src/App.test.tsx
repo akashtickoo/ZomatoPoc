@@ -1,5 +1,4 @@
-// The app against a fake API: the web counterpart of the AppTest cases in
-// tests/ui/test_streamlit_app.py. Case IDs refer to docs/edge-case.md §9.
+// The app against a fake API (test/fakeApi.ts). Case IDs refer to docs/edge-case.md §9.
 
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

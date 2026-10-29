@@ -14,7 +14,7 @@ export interface ResultsProps {
   onSuggestion: (field: SuggestionField, wrong: string, suggestion: string) => void;
 }
 
-/** What the last search returned (render_result in the Streamlit UI). */
+/** What the last search returned. */
 export default function Results({ result, payload, onSuggestion }: ResultsProps) {
   switch (result.kind) {
     case "ok":

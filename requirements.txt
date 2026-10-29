@@ -7,8 +7,7 @@
 # Data ingestion
 datasets==5.1.0
 
-# UI
-streamlit==1.66.1
+# Demo script (scripts/demo.py)
 requests==2.34.2
 
 # Testing and linting

@@ -2,7 +2,6 @@
 
     python tasks.py ingest      download and clean the dataset into data/processed/
     python tasks.py api         start the API on http://localhost:8000 (reloads on changes)
-    python tasks.py ui          start the UI on http://localhost:8501
     python tasks.py test        run the tests, then the linter
     python tasks.py demo        run the demo scenes against the running API (docs/demo.md)
     python tasks.py eval ...    run the quality evaluation (docs/eval.md)
@@ -21,7 +20,6 @@ PY = sys.executable
 TASKS: dict[str, list[list[str]]] = {
     "ingest": [[PY, "-m", "app.data.ingest"]],
     "api": [[PY, "-m", "uvicorn", "app.main:app", "--reload"]],
-    "ui": [[PY, "-m", "streamlit", "run", "ui/streamlit_app.py"]],
     "test": [[PY, "-m", "pytest"], [PY, "-m", "ruff", "check", "."]],
     "demo": [[PY, "-m", "scripts.demo"]],
     "eval": [[PY, "-m", "tests.eval.run_eval"]],

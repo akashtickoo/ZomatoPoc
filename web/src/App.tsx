@@ -1,7 +1,6 @@
-// Curated Cravings: the web front end for the recommendation API, a port of
-// ui/streamlit_app.py that runs as a static site on Vercel (docs/deployment-plan.md,
-// Phase 3). It only collects preferences and renders the API's response. Case IDs refer
-// to docs/edge-case.md §9.
+// Curated Cravings: the web front end for the recommendation API, a static site hosted
+// on Vercel (docs/deployment-plan.md). It only collects preferences and renders the API's
+// response. Case IDs refer to docs/edge-case.md §9.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 

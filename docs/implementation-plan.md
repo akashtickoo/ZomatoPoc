@@ -224,6 +224,8 @@ Phases 3 and 4 can run in parallel once Phase 2 is done. The API can serve the d
 
 ## Phase 5: Streamlit UI
 
+> **Replaced 2026-10-30.** The Streamlit UI below was ported to a static React app in `web/` so it could be hosted on Vercel, then removed along with `ui/`, `.streamlit/` and `tests/ui/` ([deployment-plan.md](deployment-plan.md), [architecture §5.10](architecture.md#510-frontend-web)). This phase is kept as the record of how it was built.
+
 **Goal:** a user-friendly interface that collects preferences and shows recommendations (§5.10). This meets the problem statement's "Output Display" requirement.
 
 **Tasks**
