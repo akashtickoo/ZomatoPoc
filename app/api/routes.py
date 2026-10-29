@@ -8,6 +8,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import RedirectResponse
 
 from app.api.schemas import (
     BudgetsResponse,
@@ -44,6 +45,12 @@ def get_service(request: Request) -> RecommendationService:
 AppSettings = Annotated[Settings, Depends(get_settings)]
 Repository = Annotated[RestaurantRepository, Depends(get_repository)]
 Service = Annotated[RecommendationService, Depends(get_service)]
+
+
+@router.get("/", include_in_schema=False)
+def root():
+    """The API has no page of its own; someone opening its address gets the docs."""
+    return RedirectResponse("/docs")
 
 
 @router.get("/health", response_model=HealthResponse, tags=["meta"])
