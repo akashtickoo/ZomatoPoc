@@ -1,0 +1,8 @@
+# The image installs its own dependencies (npm ci) and builds its own dist/.
+node_modules/
+dist/
+.env.local
+.env.*.local
+.vercel/
+Dockerfile
+.dockerignore

@@ -10,12 +10,14 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.exceptions import RequestValidationError
 
 from app.api.schemas import (
+    BudgetsResponse,
     CuisinesResponse,
     HealthResponse,
     LocationsResponse,
     ServerErrorResponse,
     ValidationErrorResponse,
 )
+from app.config import Settings
 from app.data.repository import RestaurantRepository
 from app.models.preferences import UserPreferences
 from app.models.recommendation import RecommendationResponse
@@ -25,8 +27,12 @@ from app.services.recommender import RecommendationService
 router = APIRouter()
 
 
-# Dependencies read what the lifespan hook loaded; tests can replace either one through
+# Dependencies read what the lifespan hook loaded; tests can replace any of them through
 # app.dependency_overrides.
+def get_settings(request: Request) -> Settings:
+    return request.app.state.settings
+
+
 def get_repository(request: Request) -> RestaurantRepository:
     return request.app.state.repository
 
@@ -35,6 +41,7 @@ def get_service(request: Request) -> RecommendationService:
     return request.app.state.service
 
 
+AppSettings = Annotated[Settings, Depends(get_settings)]
 Repository = Annotated[RestaurantRepository, Depends(get_repository)]
 Service = Annotated[RecommendationService, Depends(get_service)]
 
@@ -64,6 +71,13 @@ def locations(repo: Repository):
 def cuisines(repo: Repository):
     """Cuisines, sorted case-insensitively (EC-API-05)."""
     return CuisinesResponse(cuisines=repo.get_cuisines())
+
+
+@router.get("/meta/budgets", response_model=BudgetsResponse, tags=["meta"])
+def budgets(cfg: AppSettings):
+    """The budget bands in rupees for two, so a front end can label them without its own
+    copy of BUDGET_LOW_MAX and BUDGET_MEDIUM_MAX."""
+    return BudgetsResponse(low_max=cfg.budget_low_max, medium_max=cfg.budget_medium_max)
 
 
 @router.post(

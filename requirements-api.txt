@@ -1,0 +1,17 @@
+# What the API needs at runtime: Render installs only this (docs/deployment-plan.md).
+# Requires Python 3.11–3.13 (pyarrow has no Python 3.15 wheels yet).
+
+# Data
+pandas==3.1.0
+pyarrow==26.0.0
+
+# Models and config
+pydantic==2.14.1
+pydantic-settings==2.16.1
+
+# API
+fastapi==0.162.0
+uvicorn==0.54.0
+
+# LLM
+groq==1.7.0

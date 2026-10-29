@@ -14,7 +14,7 @@ An AI-powered restaurant recommender for Bangalore, built as a proof of concept 
 4. **Check.** Any pick that wasn't a candidate is dropped, and every fact on a card (name, rating, cost, cuisines) is filled in from the dataset, never from the LLM.
 5. **Fall back.** If the LLM is down, slow, rate-limited or turned off, the pre-ranked candidates are returned with template explanations and a notice.
 
-The Streamlit UI calls a FastAPI service, which does all of this. [docs/architecture.md](docs/architecture.md) has the design.
+The UI calls a FastAPI service, which does all of this. There are two versions of the UI with the same design: a Streamlit app for local use, and a static web app in `web/` that can be hosted on Vercel. [docs/architecture.md](docs/architecture.md) has the design.
 
 ## Tech stack
 
@@ -26,6 +26,7 @@ The Streamlit UI calls a FastAPI service, which does all of this. [docs/architec
 | Schemas and config | Pydantic v2; `pydantic-settings` reads `.env` | One set of models validates the request, the API response and the LLM's answer |
 | LLM | Groq's Python SDK, model `openai/gpt-oss-120b`, reasoning effort `medium` | Strict structured outputs (Groq guarantees the JSON matches the schema), about 4 s and $0.0013 a search |
 | UI | Streamlit with a custom stylesheet; `requests` to call the API | A usable form and result cards with no front-end build step |
+| Web UI (`web/`) | Vite, React and TypeScript; `react-select`; Vitest | The same UI as static files, so it can be hosted on Vercel, where Streamlit can't run |
 | Tests and lint | `pytest`, FastAPI's `TestClient`, Streamlit's `AppTest`, `ruff` | Unit, API and UI tests run offline against a fake LLM |
 | Evaluation | `qwen/qwen3.8-27b` on Groq as the LLM judge | A different model family from the one it grades |
 
@@ -36,6 +37,7 @@ Exact versions are pinned in [requirements.txt](requirements.txt). The recommend
 - **Python 3.11–3.13** (pyarrow has no wheels for newer versions yet) and Git
 - **Internet access and about 1.5 GB of disk** for the first setup: the Python packages, and a one-time download of the dataset (a 574 MB CSV, which the Hugging Face cache keeps along with a converted copy of about the same size)
 - **A Groq API key**, free at https://console.groq.com/keys. It's optional: without one everything runs, using the fallback ranking.
+- **Node.js 24**, only for the web UI in `web/`.
 
 ## Setup
 
@@ -46,10 +48,9 @@ python -m venv .venv
 .venv\Scripts\activate          # Windows; on macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env            # then set GROQ_API_KEY in .env (Windows cmd: copy .env.example .env)
-python -m app.data.ingest       # downloads the dataset, writes data/processed/
 ```
 
-The ingest prints a summary (12,415 restaurants after de-duplication; 93 locations and 107 cuisines) and writes `data/processed/restaurants.parquet` and `metadata.json`. Its warning about unauthenticated requests to the Hugging Face Hub is harmless. Run every command from the project folder with the virtual environment active.
+The processed data (`data/processed/restaurants.parquet` and `metadata.json`) is in the repository, so the API starts right away. To rebuild it, for example after changing the budget bands, run `python -m app.data.ingest`: it downloads the dataset, prints a summary (12,415 restaurants after de-duplication; 93 locations and 107 cuisines) and rewrites both files. Its warning about unauthenticated requests to the Hugging Face Hub is harmless. Run every command from the project folder with the virtual environment active.
 
 ## Run the app
 
@@ -61,6 +62,16 @@ streamlit run ui/streamlit_app.py        # UI on http://localhost:8501
 ```
 
 Open http://localhost:8501 (**Curated Cravings**), pick a locality and press **Find restaurants**, or try one of the quick searches. The UI finds the API through `API_BASE_URL` (default `http://localhost:8000`). The first time you run Streamlit it asks for an email address; press Enter to skip.
+
+**The web UI** does the same in the browser. With the API running, and `CORS_ORIGINS=["http://localhost:5173"]` in `.env` (as in `.env.example`) so the API accepts calls from the page:
+
+```bash
+cd web
+npm install
+npm run dev                              # UI on http://localhost:5173
+```
+
+It finds the API through `VITE_API_BASE_URL` (default `http://localhost:8000`; see `web/.env.example`).
 
 **Shortcuts.** `tasks.py` wraps the common commands so they're the same on every OS:
 
@@ -96,6 +107,7 @@ curl -X POST http://localhost:8000/recommendations \
 |---|---|
 | `GET /health` | Status, restaurant count, and the LLM's state: `configured`, `unconfigured` (no key), `rejected` (Groq refused the key) or `disabled` (`LLM_ENABLED=false`) |
 | `GET /meta/locations`, `GET /meta/cuisines` | Valid values for the request |
+| `GET /meta/budgets` | The budget thresholds in ₹ for two: `{"low_max": 300, "medium_max": 600}` |
 | `POST /recommendations` | Ranked recommendations; `422` with suggestions for an unknown location or cuisine |
 
 ## System prompt
@@ -271,7 +283,13 @@ pytest          # no network or API key needed; the LLM is faked, the UI tests s
 ruff check .
 ```
 
-`pytest` includes unit tests for the evaluation harness, the demo runner and `tasks.py`; running the evaluation itself is described next.
+`pytest` includes unit tests for the evaluation harness, the demo runner and `tasks.py`; running the evaluation itself is described next. The web UI has its own tests, run against a fake API, and a type-checked production build:
+
+```bash
+cd web
+npm test
+npm run build
+```
 
 ## Quality evaluation
 
@@ -309,7 +327,11 @@ app/
   services/        filtering and pre-ranking, recommender, template explanations
   llm/             Groq client, response cache, prompt builder, system prompt
 ui/                Streamlit front end and its stylesheet (theme in .streamlit/config.toml)
+web/               the same front end as a static Vite + React site, for Vercel
+data/processed/    the cleaned dataset the API loads (rebuilt by app.data.ingest)
 scripts/demo.py    the demo scenes, run against the API
+render.yaml        Render Blueprint for the API (requirements-api.txt, .python-version)
+Dockerfile         the API as a container image; docker-compose.yml runs it with web/Dockerfile
 tasks.py           shortcuts: ingest, api, ui, test, demo, eval
 tests/             unit, API and UI tests, fixtures
   eval/            quality evaluation: 24 scenarios, runner, programmatic checks, LLM judge
@@ -317,6 +339,15 @@ docs/              problem statement, architecture, implementation plan, edge ca
 ```
 
 See [docs/architecture.md](docs/architecture.md) for the design and [docs/edge-case.md](docs/edge-case.md) for the decisions behind each rule.
+
+## Deployment
+
+The API runs on Render and the web UI on Vercel. [docs/deployment-plan.md](docs/deployment-plan.md) has the steps.
+
+- **API:** `render.yaml` is a Render Blueprint. It installs only `requirements-api.txt` on Python 3.13 (from `.python-version`) and serves the committed data. In Render, set `GROQ_API_KEY`, and set `CORS_ORIGINS` to the Vercel URL, e.g. `["https://curated-cravings.vercel.app"]`.
+- **Web UI:** a Vercel project with root directory `web` and `VITE_API_BASE_URL` set to the Render URL. That value is compiled into the page and is public, so never put a secret in Vercel.
+- **Cold starts:** Render's free instance sleeps after 15 minutes without traffic and takes a minute or two to wake. The page says so while it waits.
+- **Docker:** `docker compose up --build` runs both in containers: the page on http://localhost:8080 and the API on http://localhost:8000, with `GROQ_API_KEY` read from `.env`. The images are `Dockerfile` (API) and `web/Dockerfile` (nginx serving the built page). See [the plan's Docker section](docs/deployment-plan.md#docker).
 
 ## Contributing
 

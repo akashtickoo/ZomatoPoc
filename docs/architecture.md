@@ -306,6 +306,7 @@ The service adds what happened (preferences, candidates, relaxations, the LLM ca
 | `GET` | `/health` | Liveness check, plus whether data is loaded |
 | `GET` | `/meta/locations` | Neighbourhoods for the location dropdown |
 | `GET` | `/meta/cuisines` | Cuisines for the multi-select |
+| `GET` | `/meta/budgets` | Budget thresholds, so the web UI can label the bands |
 | `POST` | `/recommendations` | Body: `UserPreferences` → `RecommendationResponse` |
 
 **Response schema:**
@@ -354,6 +355,7 @@ The schema is defined in `app/models/recommendation.py`.
 - Every response carries an `X-Request-ID` header: the id of that request's log line (§10).
 - `413`: `{"detail": "Request body too large; the limit is 16384 bytes."}`. A full request is under 2 KB, so a larger body is refused before it is parsed, whether it declares a `Content-Length` or arrives chunked (EC-IN-54).
 - `/meta/locations` and `/meta/cuisines`: `{"locations": [...]}` and `{"cuisines": [...]}`, sorted case-insensitively.
+- `/meta/budgets`: `{"low_max": 300, "medium_max": 600}`, from `BUDGET_LOW_MAX` and `BUDGET_MEDIUM_MAX`. The web UI builds its budget labels from it; the Streamlit UI reads the settings directly.
 - `422`: the same shape FastAPI uses for its own validation errors, so a client handles one format. An unknown location or cuisine has `type: "unknown_value"` and up to 3 close matches:
 
   ```json
@@ -363,11 +365,11 @@ The schema is defined in `app/models/recommendation.py`.
   ```
 - `500`: `{"detail": "Internal server error", "request_id": "…"}`; the request's log line has the same id and the traceback (EC-API-04).
 
-**Wiring** (`app/main.py`): `create_app(cfg, load_repository, make_llm)` builds the app, and the lifespan hook sets up JSON logging and loads the repository and LLM client once, before the first request. Two ASGI middlewares (`app/api/middleware.py`) wrap every request: `RequestLogMiddleware` assigns the request id, writes the log line and turns an unhandled exception into the `500` above; inside it, `BodySizeLimitMiddleware` enforces the `413`. Routes get the shared `RecommendationService` and repository through FastAPI dependencies (`get_service`, `get_repository`), so tests swap in fixture data and a fake LLM. Endpoints are plain `def`, so a slow LLM call runs in the thread pool without blocking other requests (EC-API-03).
+**Wiring** (`app/main.py`): `create_app(cfg, load_repository, make_llm)` builds the app, and the lifespan hook sets up JSON logging and loads the repository and LLM client once, before the first request. Two ASGI middlewares (`app/api/middleware.py`) wrap every request: `RequestLogMiddleware` assigns the request id, writes the log line and turns an unhandled exception into the `500` above; inside it, `BodySizeLimitMiddleware` enforces the `413`. Outside both, Starlette's `CORSMiddleware` lets the web front end call the API from the browser, from the origins in `CORS_ORIGINS` and `CORS_ORIGIN_REGEX` only (none by default). Being outermost, it adds its headers to the `413` and `500` responses too, which a browser would otherwise hide behind a CORS error; it answers preflight requests itself, so those get no request id or log line. Routes get the shared `RecommendationService`, repository and settings through FastAPI dependencies (`get_service`, `get_repository`, `get_settings`), so tests swap in fixture data and a fake LLM. Endpoints are plain `def`, so a slow LLM call runs in the thread pool without blocking other requests (EC-API-03).
 
-### 5.10 Frontend (`ui/streamlit_app.py`)
+### 5.10 Frontend (`web/` and `ui/streamlit_app.py`)
 
-"Curated Cravings": a single page in a warm dark theme with a soft coral accent, modelled on restaurant-discovery apps.
+"Curated Cravings": a single page in a warm dark theme with a soft coral accent, modelled on restaurant-discovery apps. It exists twice, with the same design and behaviour: the Streamlit app, which ran the POC, and a port of it in `web/`, a static site for hosting on Vercel, where Streamlit's long-running server can't run ([deployment-plan.md](deployment-plan.md)). Both call the same API.
 
 - **Header:** a slim navigation bar (Bangalore, the number of neighbourhoods) and a hero with the title "Curated Cravings".
 - **Search card on the main screen:** locality (searchable select, starting with "All of Bangalore", sent as `Bangalore`, D-04), cuisines (multi-select), minimum rating (slider), budget for two (segmented control showing the ₹ thresholds from config), "Anything else?" free text (300 characters) and how many results. The footer says how the last search was ranked ("Screened 15 candidates · AI ranked top 5") next to the **Find restaurants** button. Dropdown options come from `/meta/*`, so users can only pick values that exist in the data.
@@ -382,6 +384,14 @@ As built (`ui/streamlit_app.py`):
 - **Caching:** `/meta/*` is cached for an hour and `/health` for 30 s (EC-UI-05). The request timeout is the LLM timeout plus a margin; the API makes one LLM call per search (EC-UI-03).
 - **Errors:** an unreachable API shows a message and a Retry button instead of the form (EC-UI-01); a 422 shows the message with one-click suggestions (EC-UI-06); a 500 shows the server's reference id; a banner says AI ranking is off, and why, when `/health` reports the LLM unconfigured, rejected or disabled.
 - **Config:** the API URL (`API_BASE_URL`), budget thresholds and LLM timeout come from `app.config`, the same settings the API uses.
+
+The web front end (`web/`): Vite, React and TypeScript, built to static files.
+
+- **Escaping:** React renders every value as text, and no source file may use `dangerouslySetInnerHTML` (a test checks), so EC-UI-20 holds without escaping by hand.
+- **State and calls:** the same as above: the filters and the last result live in React state, only Find restaurants or a quick-search pill calls the API, and the result kinds (`ok`, `invalid`, `unavailable`, `error`) are those of the Streamlit app (`web/src/api.ts`). The button is disabled while a search runs (EC-UI-04).
+- **A sleeping API:** the hosted API sleeps when idle. On load the page polls `/health` every 5 s for up to 3 minutes, saying the kitchen is waking up, before it shows the EC-UI-01 error with Retry; a tab idle for 14 minutes checks `/health` again before searching.
+- **Config:** the API URL comes from `VITE_API_BASE_URL`, compiled into the bundle at build time, and the budget labels from `/meta/budgets`. Browser calls need the page's origin in the API's `CORS_ORIGINS`.
+- **Look:** `web/src/styles.css` holds the `cc-*` rules from `ui/style.css` and the theme from `.streamlit/config.toml`.
 
 ---
 
@@ -449,9 +459,14 @@ ZomatoPoc/
 │   ├── streamlit_app.py
 │   └── style.css               # Layout and card styles
 ├── .streamlit/config.toml      # Theme: colours, font, corner radius
+├── web/                        # The same UI as a static site for Vercel (§5.10)
+│   ├── src/                    # App, components, API calls, helpers, Vitest tests
+│   ├── package.json            # Exact versions; Node 24
+│   ├── vercel.json
+│   └── Dockerfile, nginx.conf  # Static build served by nginx, for docker-compose.yml
 ├── scripts/demo.py             # Runs the demo scenes against the API (docs/demo.md)
-├── data/                       # git-ignored
-│   └── processed/
+├── data/
+│   └── processed/              # committed, so a deploy never runs the ingest
 ├── logs/                       # git-ignored; LOG_FILE output
 ├── tests/
 │   ├── unit/
@@ -466,11 +481,17 @@ ZomatoPoc/
 │   ├── edge-case.md            # Edge cases and the decisions behind each rule (D-xx)
 │   ├── eval.md                 # Evaluation plan and results log
 │   ├── demo.md                 # Demo script
+│   ├── deployment-plan.md      # API on Render, web front end on Vercel
 │   └── images/                 # README screenshot
 ├── tasks.py                    # Shortcuts: ingest, api, ui, test, demo, eval
 ├── pyproject.toml              # pytest and ruff settings
+├── render.yaml                 # Render Blueprint for the API
+├── Dockerfile                  # The API as a container image (web/Dockerfile: the front end)
+├── docker-compose.yml          # Both images together, locally
+├── .python-version             # 3.13, for Render
 ├── .env.example
-├── requirements.txt
+├── requirements-api.txt        # The API's runtime dependencies (what Render installs)
+├── requirements.txt            # requirements-api.txt plus ingest, UI and test tools
 └── README.md
 ```
 
@@ -515,6 +536,8 @@ All tunables live in `app/config.py` and can be overridden through environment v
 | `DATASET_REPO` / `DATASET_REVISION` | `ManikaSaini/zomato-restaurant-recommendation` / `5738e9e…` | Source dataset, pinned to a commit so ingests are reproducible |
 | `DATA_PATH` | `data/processed/restaurants.parquet` | Processed data location |
 | `API_BASE_URL` | `http://localhost:8000` | Used by the Streamlit UI |
+| `CORS_ORIGINS` | `[]` | Browser origins allowed to call the API, as a JSON list: the web front end (`["http://localhost:5173"]` locally, the Vercel URL in production). Trailing slashes are dropped |
+| `CORS_ORIGIN_REGEX` | – | Optional pattern for this project's Vercel preview URLs, matched against the whole origin |
 | `LOG_LEVEL` | `INFO` | Level for the app's own loggers (libraries log warnings and up) |
 | `LOG_FILE` | – | If set, log lines are also appended to this file, e.g. for the cost report |
 

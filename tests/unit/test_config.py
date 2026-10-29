@@ -18,6 +18,7 @@ def test_defaults_match_architecture(make_settings):
     assert s.dataset_revision == "5738e9eda2fad49ad51c6e0ed26e761d9b947133"
     assert s.data_path == PROJECT_ROOT / "data" / "processed" / "restaurants.parquet"
     assert s.api_base_url == "http://localhost:8000"
+    assert (s.cors_origins, s.cors_origin_regex) == ([], None)
     assert s.groq_api_key is None
     assert (s.llm_price_input, s.llm_price_cached_input, s.llm_price_output) == (0.15, 0.075, 0.6)
     assert (s.log_level, s.log_file) == ("INFO", None)
@@ -36,6 +37,12 @@ def test_env_vars_override_defaults(make_settings, monkeypatch):
     s = make_settings()
     assert s.llm_effort == "low"
     assert s.candidate_top_k == 40
+
+
+def test_cors_origins_are_a_json_list_without_trailing_slashes(make_settings, monkeypatch):
+    # The way the deployment plan sets it on Render, with the easy slip of a trailing "/".
+    monkeypatch.setenv("CORS_ORIGINS", '["https://curated-cravings.vercel.app/", " x.dev "]')
+    assert make_settings().cors_origins == ["https://curated-cravings.vercel.app", "x.dev"]
 
 
 def test_api_key_is_not_exposed_in_repr(make_settings):

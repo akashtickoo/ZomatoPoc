@@ -1,0 +1,28 @@
+# Render Blueprint for the API (docs/deployment-plan.md, Phase 2). The web front end in
+# web/ is deployed on Vercel. In Render: New → Blueprint, then pick this repository.
+services:
+  - type: web
+    name: curated-cravings-api
+    runtime: python              # the version comes from .python-version
+    plan: free
+    region: singapore            # closest to Bangalore; can't be changed after creation
+    buildCommand: pip install -r requirements-api.txt
+    # One worker: each would load its own copy of the data and keep its own LLM cache.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    buildFilter:                 # front-end and docs commits don't redeploy the API
+      paths:
+        - app/**
+        - data/processed/**
+        - requirements-api.txt
+        - .python-version
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false              # a secret: entered in the dashboard, never in git
+      - key: CORS_ORIGINS
+        sync: false              # e.g. ["https://curated-cravings.vercel.app"]
+      - key: CORS_ORIGIN_REGEX
+        sync: false              # optional, for Vercel preview deployments
+      - key: LOG_LEVEL
+        value: INFO

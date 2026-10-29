@@ -1,0 +1,27 @@
+# The API image (Dockerfile) needs only requirements-api.txt, app/ and data/processed/.
+# Everything else stays out of the build context, secrets first.
+.env
+.env.*
+!.env.example
+
+.git/
+.venv/
+venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# The web front end has its own image (web/Dockerfile).
+web/
+
+# Only the processed data, not raw downloads; no logs; nothing the API doesn't run.
+/data/*
+!/data/processed/
+/logs/
+tests/
+docs/
+ui/
+scripts/
+.streamlit/
+.vscode/
