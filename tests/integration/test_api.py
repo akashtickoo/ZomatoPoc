@@ -311,6 +311,13 @@ def test_docs_list_the_five_endpoints(client):
     assert client.get("/docs").status_code == 200
 
 
+def test_the_bare_address_opens_the_docs(client):
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "/docs"
+    assert client.get("/").url.path == "/docs"
+
+
 # --- CORS for the web front end (docs/deployment-plan.md, task 1.4) ------------------------
 
 ORIGIN = "https://curated-cravings.vercel.app"
