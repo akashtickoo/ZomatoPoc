@@ -2,7 +2,7 @@
 
 This plan puts Curated Cravings online: the FastAPI service on [Render](https://render.com) and the front end on [Vercel](https://vercel.com). It builds on [architecture.md](architecture.md) and [implementation-plan.md](implementation-plan.md), and uses the same format: each phase has a goal, tasks, deliverables and **exit criteria**, and a phase is done only when all of its exit criteria pass.
 
-> **Status (2026-10-30):** the code for Phases 1 and 3 is done and its exit criteria pass locally. Phases 2, 4 and 5 happen in the Render and Vercel dashboards and haven't started. Before pushing, commit `data/processed/` (task 1.3, after checking the data terms).
+> **Status (2026-10-30):** the code for Phases 1 and 3 is done and its exit criteria pass locally. Phases 2, 4 and 5 happen in the Render and Vercel dashboards and haven't started. Everything, `data/processed/` included, is pushed to the `deployment-setup` branch; Render and Vercel deploy from `main` once it's merged.
 
 ---
 
@@ -102,7 +102,7 @@ Phases 2 and 3 can run in parallel: the front end is built against the local API
   ruff==0.17.3
   ```
 
-- [ ] **1.3 Ship the processed data with the code.** *(Code done: `.gitignore` and the test. The files still need committing.)*
+- [x] **1.3 Ship the processed data with the code.**
   - **Check the data terms first.** The repository is public, so committing `restaurants.parquet` republishes the cleaned data, review snippets included. The Hugging Face dataset lists no license. If that's a concern, skip the commit: upload the parquet file to a private Hugging Face dataset and download it in the Render build command with a token stored as a Render secret.
   - Change `.gitignore` so only the processed folder is tracked:
 
