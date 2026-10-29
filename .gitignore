@@ -8,9 +8,12 @@ __pycache__/
 # Secrets
 .env
 
-# Data (downloaded and generated; recreate with `python -m app.data.ingest`). Anchored to
-# the project root: a bare "data/" would also ignore the app/data/ source package.
-/data/
+# Data. The processed files (data/processed/, 3.4 MB) are committed, so a deploy never
+# has to run `python -m app.data.ingest` (docs/deployment-plan.md); anything else under
+# data/ stays out. Anchored to the project root: a bare "data/" would also ignore the
+# app/data/ source package.
+/data/*
+!/data/processed/
 
 # Request logs (LOG_FILE)
 /logs/

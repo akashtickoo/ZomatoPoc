@@ -1,0 +1,33 @@
+# The API and the web front end together, in containers (docs/deployment-plan.md, "Docker"):
+#
+#   docker compose up --build
+#
+# then open http://localhost:8080; the API is on http://localhost:8000 (/docs).
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      # GROQ_API_KEY and any other settings. Without the file, every search gets the fallback
+      # ranking. Don't set LOG_FILE here: the container can't write to its own folder.
+      - path: .env
+        required: false
+    environment:
+      # The page below calls the API from the browser, from this origin. This overrides
+      # CORS_ORIGINS in .env.
+      CORS_ORIGINS: '["http://localhost:8080"]'
+
+  web:
+    build:
+      context: ./web
+      args:
+        # Compiled into the page, which runs in the browser: the API as the browser sees it,
+        # not the service name "api".
+        VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "8080:8080"
+    depends_on:
+      api:
+        condition: service_healthy

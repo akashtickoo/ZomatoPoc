@@ -27,6 +27,14 @@ class CuisinesResponse(BaseModel):
     cuisines: list[str]
 
 
+class BudgetsResponse(BaseModel):
+    """The budget bands, in rupees for two: low is up to `low_max`, medium up to
+    `medium_max`, high above it (BUDGET_LOW_MAX, BUDGET_MEDIUM_MAX)."""
+
+    low_max: int
+    medium_max: int
+
+
 class ErrorDetail(BaseModel):
     """One problem with the request, in the shape FastAPI uses for its own 422s.
 

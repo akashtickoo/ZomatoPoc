@@ -56,6 +56,11 @@ def recommend(client, **body):
     return client.post("/recommendations", json=body)
 
 
+def recommend_from(client, origin, **body):
+    """The same request as a browser on another origin sends it."""
+    return client.post("/recommendations", json=body, headers={"Origin": origin})
+
+
 def request_records(caplog) -> list[logging.LogRecord]:
     """The per-request log lines (architecture §10)."""
     return [r for r in caplog.records if r.name == REQUEST_LOGGER]
@@ -107,6 +112,12 @@ def test_meta_lists_are_sorted_and_unique(client, fixture_repo, path, key):  # E
     assert values == sorted(set(values), key=str.casefold)
     expected = fixture_repo.get_locations() if key == "locations" else fixture_repo.get_cuisines()
     assert values == expected
+
+
+def test_meta_budgets_follow_the_settings(make_client, llm):
+    assert make_client(llm).get("/meta/budgets").json() == {"low_max": 300, "medium_max": 600}
+    client = make_client(llm, budget_low_max=250, budget_medium_max=800)
+    assert client.get("/meta/budgets").json() == {"low_max": 250, "medium_max": 800}
 
 
 # --- POST /recommendations: success paths -------------------------------------------------
@@ -287,11 +298,91 @@ def test_missing_data_stops_startup(make_settings, tmp_path):  # EC-CFG-01
             pass
 
 
-def test_docs_list_the_four_endpoints(client):
+def test_docs_list_the_five_endpoints(client):
     paths = client.get("/openapi.json").json()["paths"]
-    assert set(paths) == {"/health", "/meta/locations", "/meta/cuisines", "/recommendations"}
+    assert set(paths) == {
+        "/health",
+        "/meta/locations",
+        "/meta/cuisines",
+        "/meta/budgets",
+        "/recommendations",
+    }
     assert set(paths["/recommendations"]) == {"post"}
     assert client.get("/docs").status_code == 200
+
+
+# --- CORS for the web front end (docs/deployment-plan.md, task 1.4) ------------------------
+
+ORIGIN = "https://curated-cravings.vercel.app"
+PREVIEWS = r"https://curated-cravings-[a-z0-9-]+-team\.vercel\.app"
+
+
+def preflight(client, origin):
+    """What a browser sends before a cross-origin JSON POST."""
+    headers = {
+        "Origin": origin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type",
+    }
+    return client.options("/recommendations", headers=headers)
+
+
+def test_cors_allows_the_configured_origin(make_client, llm):
+    client = make_client(llm, cors_origins=[ORIGIN])
+    response = preflight(client, ORIGIN)
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == ORIGIN
+    assert "POST" in response.headers["access-control-allow-methods"]
+    response = recommend_from(client, ORIGIN, location="Indiranagar", top_n=3)
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == ORIGIN
+    assert response.headers["access-control-expose-headers"] == "X-Request-ID"
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "https://evil.example",
+        "https://curated-cravings.vercel.app.evil.example",
+        "https://other-app.vercel.app",
+    ],
+)
+def test_cors_refuses_other_origins(make_client, llm, origin):
+    client = make_client(llm, cors_origins=[ORIGIN], cors_origin_regex=PREVIEWS)
+    assert preflight(client, origin).status_code == 400
+    response = client.get("/health", headers={"Origin": origin})
+    assert "access-control-allow-origin" not in response.headers
+
+
+def test_cors_regex_allows_preview_deployments(make_client, llm):
+    client = make_client(llm, cors_origin_regex=PREVIEWS)
+    for origin in [
+        "https://curated-cravings-git-main-team.vercel.app",
+        "https://curated-cravings-k3j2h1g9f-team.vercel.app",
+    ]:
+        assert preflight(client, origin).headers["access-control-allow-origin"] == origin
+
+
+def test_cors_allows_nothing_by_default(client):
+    assert preflight(client, "http://localhost:5173").status_code == 400
+
+
+def test_error_responses_carry_cors_headers(make_client, llm):
+    # Without the headers the browser hides the response, and the UI can't show the real
+    # error, the suggestions from a 422 or the request id from a 500.
+    client = make_client(llm, cors_origins=[ORIGIN])
+    invalid = recommend_from(client, ORIGIN, location="Indranagar")
+    too_big = client.post(
+        "/recommendations",
+        content=json.dumps({"location": "BTM", "additional_preferences": "x" * MAX_BODY_BYTES}),
+        headers={"Origin": ORIGIN, "content-type": "application/json"},
+    )
+    client.app.dependency_overrides[get_service] = ExplodingService
+    crashed = recommend_from(client, ORIGIN, location="BTM")
+    for response, status in [(invalid, 422), (too_big, 413), (crashed, 500)]:
+        assert response.status_code == status
+        assert response.headers["access-control-allow-origin"] == ORIGIN
+    assert crashed.headers["X-Request-ID"] == crashed.json()["request_id"]
 
 
 # --- Request log lines and response metadata (architecture §10) ---------------------------

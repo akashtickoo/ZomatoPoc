@@ -10,6 +10,7 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.middleware import BodySizeLimitMiddleware, RequestLogMiddleware
 from app.api.routes import router
@@ -46,6 +47,7 @@ def create_app(
             logger.info("The LLM is disabled; every request will use the fallback ranking")
         elif not getattr(llm, "is_configured", True):
             logger.warning("GROQ_API_KEY is not set; every request will use the fallback ranking")
+        app.state.settings = cfg
         app.state.repository = repository
         app.state.llm = llm
         # One repository and one LLM client, shared by all requests (EC-API-02).
@@ -64,6 +66,17 @@ def create_app(
     # an id and a log line, and an unhandled error becomes a 500 (EC-API-04).
     app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(RequestLogMiddleware)
+    # Added last, so it runs first: the 413s and 500s above carry CORS headers too, or the
+    # browser would report a CORS failure instead of the real error. It answers preflight
+    # requests itself, so those get no request id or log line (docs/deployment-plan.md).
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cfg.cors_origins,
+        allow_origin_regex=cfg.cors_origin_regex,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
+        expose_headers=["X-Request-ID"],  # so the web UI can quote it on an error
+    )
     return app
 
 

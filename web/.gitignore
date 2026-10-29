@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# Local overrides of .env.example, e.g. VITE_API_BASE_URL
+.env.local
+.env.*.local
+.vercel/
